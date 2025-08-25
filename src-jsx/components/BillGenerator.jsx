@@ -15,8 +15,9 @@ const BillGenerator = ({ onLogout }) => {
     partyName: "",
     date: "",
     vehicleNumber: "",
-    bill: "",
+    billNumber: "",
     amount: "",
+    bill: "",
     quanrev: "",
     dust: "",
     gst: "",
@@ -32,6 +33,8 @@ const BillGenerator = ({ onLogout }) => {
   const [showInvoice, setShowInvoice] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [savedDrafts, setSavedDrafts] = useState([]);
+  const [includeDhara, setIncludeDhara] = useState(true);
+  const [includeBankCharges, setIncludeBankCharges] = useState(true);
 
   // Refs for keyboard navigation
   const inputRefs = useRef([]);
@@ -76,9 +79,9 @@ const BillGenerator = ({ onLogout }) => {
   const totalQuantity =
     (parseFloat(formData.quanrev) || 0) - (parseFloat(formData.dust) || 0);
   const itemTotal = items.reduce((acc, item) => acc + item.total, 0);
-  const OPFP = (itemTotal * 0.015).toFixed(0);
-  const sTotal = (itemTotal - parseFloat(OPFP)).toFixed(0);
-  const bankCharges = 67;
+  const OPFP = includeDhara ? (itemTotal * 0.015).toFixed(0) : 0;
+  const bankCharges = includeBankCharges ? 67 : 0;
+  const sTotal = (itemTotal - parseFloat(OPFP) - parseFloat(bankCharges)).toFixed(0);
 
   const grandTotal =
     items.length ||
@@ -371,18 +374,18 @@ const BillGenerator = ({ onLogout }) => {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <Label
-                    htmlFor="bill"
+                    htmlFor="billNumber"
                     className="text-slate-700 font-semibold text-sm"
                   >
-                    Basic Price
+                    Bill Number
                   </Label>
                   <Input
-                    id="bill"
+                    id="billNumber"
                     ref={addInputRef}
                     onKeyDown={(e) => handleKeyDown(e, 1)}
-                    value={formData.bill}
-                    onChange={(e) => updateFormData("bill", e.target.value)}
-                    placeholder="0.00"
+                    value={formData.billNumber}
+                    onChange={(e) => updateFormData("billNumber", e.target.value)}
+                    placeholder="Enter bill number"
                     className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
@@ -403,6 +406,24 @@ const BillGenerator = ({ onLogout }) => {
                     className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label
+                  htmlFor="bill"
+                  className="text-slate-700 font-semibold text-sm"
+                >
+                  Basic Price
+                </Label>
+                <Input
+                  id="bill"
+                  ref={addInputRef}
+                  onKeyDown={(e) => handleKeyDown(e, 3)}
+                  value={formData.bill}
+                  onChange={(e) => updateFormData("bill", e.target.value)}
+                  placeholder="0.00"
+                  className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -466,7 +487,7 @@ const BillGenerator = ({ onLogout }) => {
                     id="date"
                     type="date"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 5)}
+                    onKeyDown={(e) => handleKeyDown(e, 6)}
                     value={formData.date}
                     onChange={(e) => updateFormData("date", e.target.value)}
                     className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
@@ -482,7 +503,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="vehicleNumber"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 6)}
+                    onKeyDown={(e) => handleKeyDown(e, 7)}
                     value={formData.vehicleNumber}
                     onChange={(e) =>
                       updateFormData("vehicleNumber", e.target.value)
@@ -492,6 +513,7 @@ const BillGenerator = ({ onLogout }) => {
                   />
                 </div>
               </div>
+
             </CardContent>
           </Card>
 
@@ -597,12 +619,43 @@ const BillGenerator = ({ onLogout }) => {
               </div>
 
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-slate-700">
-                  <strong className="text-slate-800">Dhara (1.5%):</strong>{" "}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-slate-700 font-medium">Dhara (1.5%)</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={includeDhara}
+                        onChange={() => setIncludeDhara(!includeDhara)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
                   <span className="text-blue-600 font-semibold text-base">
-                    ₹{OPFP}
+                    {includeDhara ? `-₹${OPFP}` : '₹0'}
                   </span>
-                </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-slate-700 font-medium">Bank Charges</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={includeBankCharges}
+                        onChange={() => setIncludeBankCharges(!includeBankCharges)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                  <span className="text-blue-600 font-semibold text-base">
+                    {includeBankCharges ? `-₹${bankCharges}` : '₹0'}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -773,7 +826,7 @@ const BillGenerator = ({ onLogout }) => {
         {/* Invoice Modal */}
         {showInvoice && (
           <InvoiceModal
-            formData={formData}
+            formData={{ ...formData, includeDhara, includeBankCharges }}
             items={items}
             calculations={{
               itemTotal,

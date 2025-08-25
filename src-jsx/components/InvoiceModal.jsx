@@ -62,30 +62,27 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
   };
 
   const handleDownloadPDF = () => {
-    const d = new Date(formData.date);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = String(d.getFullYear()).slice(-2);
-    const fileName = `${formData.partyName || "Invoice"}-${day}-${month}-${year}.pdf`;
-
     const element = document.getElementById("invoice-section");
     if (!element) return;
 
+    // Format the date as DD-MM-YYYY
+    const formattedDate = new Date(formData.date).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).split('/').join('.');
+
+    // Create filename with party name, vehicle number, and date
+    const partyName = formData.partyName.replace(/\s+/g, '_').replace(/[^\w\s]/gi, '');
+    const vehicleNumber = formData.vehicleNumber.replace(/\s+/g, '_').replace(/[^\w\s]/gi, '');
+    const filename = `${partyName}_${vehicleNumber}_${formattedDate}.pdf`;
+
     const opt = {
       margin: 0.5,
-      filename: fileName,
+      filename: filename,
       image: { type: "jpeg", quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        backgroundColor: "#fff",
-        useCORS: true,
-        letterRendering: true,
-      },
-      jsPDF: {
-        unit: "in",
-        format: "a4",
-        orientation: "portrait",
-      },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
     };
 
     html2pdf().set(opt).from(element).save();
@@ -136,27 +133,23 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
           </div>
 
           {/* Invoice Details */}
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            <div>
+          <div className="flex justify-between mb-8">
+            <div className="w-1/3">
               <h3 className="text-lg font-semibold text-gray-700 mb-3">
-                Bill To:
+                Bill From:
               </h3>
               <p className="text-xl font-medium text-gray-800">
                 {formData.partyName}
               </p>
             </div>
-            <div className="text-right">
-              <p>
-                <strong>Date:</strong>{" "}
-                {new Date(formData.date).toLocaleDateString()}
-              </p>
-              <p>
-                <strong>Vehicle Number:</strong> {formData.vehicleNumber}
-              </p>
+            <div className="w-1/2 text-right space-y-2">
+              <p><strong>Date:</strong> {new Date(formData.date).toLocaleDateString()}</p>
+              <p><strong>Vehicle Number:</strong> {formData.vehicleNumber}</p>
+              {formData.billNumber && (
+                <p><strong>Bill No:</strong> {formData.billNumber}</p>
+              )}
               {formData.bill && (
-                <p>
-                  <strong>Basic Price:</strong> ₹{formData.bill}
-                </p>
+                <p><strong>Basic Price:</strong> ₹{formData.bill}</p>
               )}
             </div>
           </div>
@@ -225,12 +218,22 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
                 </span>
                 <span>₹{itemTotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>
-                  <strong>Dhara (1.5%):</strong>
-                </span>
-                <span>-₹{OPFP}</span>
-              </div>
+              {formData.includeDhara !== false && (
+                <div className="flex justify-between">
+                  <span>
+                    <strong>Dhara (1.5%):</strong>
+                  </span>
+                  <span>-₹{OPFP}</span>
+                </div>
+              )}
+              {formData.includeBankCharges !== false && (
+                <div className="flex justify-between">
+                  <span>
+                    <strong>Bank Charges:</strong>
+                  </span>
+                  <span>-₹{bankCharges}</span>
+                </div>
+              )}
               {formData.gst && (
                 <div className="flex justify-between">
                   <span>
