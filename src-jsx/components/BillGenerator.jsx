@@ -113,16 +113,17 @@ const BillGenerator = ({ onLogout }) => {
     'billNumber',   // 1
     'amount',       // 2
     'bill',         // 3 (basic price)
-    'dust',         // 4
-    'date',         // 5
-    'vehicleNumber',// 6
-    'gst',         // 7
-    'tds2',        // 8 (TDS 2%)
-    'tds01',       // 9 (TDS 0.1%)
-    'be',          // 10 (Billing Excess)
-    'dalla',       // 11
-    'quantity',    // 12
-    'price'        // 13
+    'quanrev',      // 4 (quantity received)
+    'dust',         // 5
+    'date',         // 6
+    'vehicleNumber',// 7
+    'gst',         // 8
+    'tds2',        // 9 (TDS 2%)
+    'tds01',       // 10 (TDS 0.1%)
+    'be',          // 11 (Billing Excess)
+    'dalla',       // 12
+    'quantity',    // 13
+    'price'        // 14
   ];
 
   // Function to get the next input field
@@ -442,7 +443,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="quanrev"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 3)}
+                    onKeyDown={(e) => handleKeyDown(e, 4)}
                     value={formData.quanrev}
                     onChange={(e) => updateFormData("quanrev", e.target.value)}
                     placeholder="0"
@@ -459,7 +460,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="dust"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 4)}
+                    onKeyDown={(e) => handleKeyDown(e, 5)}
                     value={formData.dust}
                     onChange={(e) => updateFormData("dust", e.target.value)}
                     placeholder="0"
@@ -542,7 +543,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="gst"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 7)}
+                    onKeyDown={(e) => handleKeyDown(e, 8)}
                     value={formData.gst}
                     onChange={(e) => updateFormData("gst", e.target.value)}
                     placeholder="0.00"
@@ -559,7 +560,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="tds2"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 8)}
+                    onKeyDown={(e) => handleKeyDown(e, 9)}
                     value={formData.tds2}
                     onChange={(e) => updateFormData("tds2", e.target.value)}
                     placeholder="0.00"
@@ -579,7 +580,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="tds01"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 9)}
+                    onKeyDown={(e) => handleKeyDown(e, 10)}
                     value={formData.tds01}
                     onChange={(e) => updateFormData("tds01", e.target.value)}
                     placeholder="0.00"
@@ -596,7 +597,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="be"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 12)}
+                    onKeyDown={(e) => handleKeyDown(e, 11)}
                     value={formData.be}
                     onChange={(e) => updateFormData("be", e.target.value)}
                     placeholder="0.00"
@@ -615,7 +616,7 @@ const BillGenerator = ({ onLogout }) => {
                 <Input
                   id="dalla"
                   ref={addInputRef}
-                  onKeyDown={(e) => handleKeyDown(e, 13)}
+                  onKeyDown={(e) => handleKeyDown(e, 12)}
                   value={formData.dalla}
                   onChange={(e) => updateFormData("dalla", e.target.value)}
                   placeholder="0.00"
@@ -686,7 +687,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="quantity"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 10)}
+                    onKeyDown={(e) => handleKeyDown(e, 13)}
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     placeholder="Enter quantity"
@@ -703,7 +704,7 @@ const BillGenerator = ({ onLogout }) => {
                   <Input
                     id="price"
                     ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 11)}
+                    onKeyDown={(e) => handleKeyDown(e, 14)}
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder="Enter price"
