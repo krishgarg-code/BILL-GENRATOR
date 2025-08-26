@@ -274,12 +274,6 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
                   <span>-₹{formData.dalla}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span>
-                  <strong>Bank Charges:</strong>
-                </span>
-                <span>-₹{bankCharges}</span>
-              </div>
 
               <hr className="my-3" />
 

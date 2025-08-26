@@ -257,6 +257,7 @@ const BillGenerator = ({ onLogout }) => {
       partyName: "",
       date: "",
       vehicleNumber: "",
+      billNumber: "",
       bill: "",
       amount: "",
       quanrev: "",
