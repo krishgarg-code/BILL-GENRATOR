@@ -96,8 +96,7 @@ const BillGenerator = ({ onLogout }) => {
           parseFloat(formData.be || "0") -
           parseFloat(formData.tds2 || "0") -
           parseFloat(formData.tds01 || "0") -
-          parseFloat(formData.dalla || "0") -
-          bankCharges
+          parseFloat(formData.dalla || "0")
         ).toFixed(2)
       : "0.00";
 
@@ -108,73 +107,78 @@ const BillGenerator = ({ onLogout }) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Define the exact navigation order based on field IDs
+  const navigationOrder = [
+    'partyName',    // 0
+    'billNumber',   // 1
+    'amount',       // 2
+    'bill',         // 3 (basic price)
+    'dust',         // 4
+    'date',         // 5
+    'vehicleNumber',// 6
+    'gst',         // 7
+    'tds2',        // 8 (TDS 2%)
+    'tds01',       // 9 (TDS 0.1%)
+    'be',          // 10 (Billing Excess)
+    'dalla',       // 11
+    'quantity',    // 12
+    'price'        // 13
+  ];
+
+  // Function to get the next input field
+  const getNextInput = (currentInput) => {
+    const currentIndex = navigationOrder.indexOf(currentInput.id);
+    if (currentIndex === -1) return null;
+    
+    const nextIndex = (currentIndex + 1) % navigationOrder.length;
+    const nextId = navigationOrder[nextIndex];
+    return inputRefs.current.find(ref => ref?.id === nextId);
+  };
+
+  // Function to get the previous input field
+  const getPrevInput = (currentInput) => {
+    const currentIndex = navigationOrder.indexOf(currentInput.id);
+    if (currentIndex === -1) return null;
+    
+    const prevIndex = (currentIndex - 1 + navigationOrder.length) % navigationOrder.length;
+    const prevId = navigationOrder[prevIndex];
+    return inputRefs.current.find(ref => ref?.id === prevId);
+  };
+
   // Keyboard navigation
   const handleKeyDown = (e, index) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      // Custom navigation sequence
-      const nextIndex = index + 1;
-      if (index === 12) { // After Billing Excess
-        const dallaInput = inputRefs.current.find(ref => ref?.id === "dalla");
-        if (dallaInput) dallaInput.focus();
-      } else if (index === 13) { // After Dalla
-        const quantityInput = inputRefs.current.find(ref => ref?.id === "quantity");
-        if (quantityInput) quantityInput.focus();
-      } else if (index === 10) { // After Quantity
-        const priceInput = inputRefs.current.find(ref => ref?.id === "price");
-        if (priceInput) priceInput.focus();
-      } else {
-        const next = inputRefs.current[nextIndex];
-        if (next) next.focus();
-      }
-    }
+    // Get the current input element
+    const currentInput = inputRefs.current[index];
+    if (!currentInput) return;
 
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      // Custom navigation sequence
-      const nextIndex = index + 1;
-      if (index === 12) { // After Billing Excess
-        const dallaInput = inputRefs.current.find(ref => ref?.id === "dalla");
-        if (dallaInput) dallaInput.focus();
-      } else if (index === 13) { // After Dalla
-        const quantityInput = inputRefs.current.find(ref => ref?.id === "quantity");
-        if (quantityInput) quantityInput.focus();
-      } else if (index === 10) { // After Quantity
-        const priceInput = inputRefs.current.find(ref => ref?.id === "price");
-        if (priceInput) priceInput.focus();
-      } else {
-        const next = inputRefs.current[nextIndex];
-        if (next) next.focus();
-      }
-    }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      // Custom navigation sequence
-      const prevIndex = index - 1;
-      if (index === 11) { // Price
-        const quantityInput = inputRefs.current.find(ref => ref?.id === "quantity");
-        if (quantityInput) quantityInput.focus();
-      } else if (index === 10) { // Quantity
-        const dallaInput = inputRefs.current.find(ref => ref?.id === "dalla");
-        if (dallaInput) dallaInput.focus();
-      } else if (index === 13) { // Dalla
-        const beInput = inputRefs.current.find(ref => ref?.id === "be");
-        if (beInput) beInput.focus();
-      } else {
-        const prev = inputRefs.current[prevIndex];
-        if (prev) prev.focus();
-      }
-    }
-
+    // Handle Ctrl+Enter to generate invoice
     if (e.ctrlKey && e.key === "Enter") {
       e.preventDefault();
       handleGenerate();
+      return;
     }
 
+    // Handle Shift to add item
     if (e.key === "Shift") {
       e.preventDefault();
       handleAddItem();
+      return;
+    }
+
+    // Navigation on Enter or ArrowDown
+    if ((e.key === "Enter" || e.key === "ArrowDown") && !e.shiftKey) {
+      e.preventDefault();
+      const nextInput = getNextInput(currentInput);
+      nextInput?.focus();
+      return;
+    }
+
+    // Navigation on ArrowUp
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevInput = getPrevInput(currentInput);
+      prevInput?.focus();
+      return;
     }
 
     if (e.ctrlKey && e.key === "s") {
