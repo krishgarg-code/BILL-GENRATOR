@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
 import InvoiceModal from "./InvoiceModal";
 
 const BillGenerator = ({ onLogout }) => {
   const { toast } = useToast();
+  const { setOpen } = useSidebar();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -85,19 +87,19 @@ const BillGenerator = ({ onLogout }) => {
 
   const grandTotal =
     items.length ||
-    formData.gst ||
-    formData.be ||
-    formData.tds2 ||
-    formData.tds01 ||
-    formData.dalla
+      formData.gst ||
+      formData.be ||
+      formData.tds2 ||
+      formData.tds01 ||
+      formData.dalla
       ? (
-          parseFloat(sTotal || "0") +
-          parseFloat(formData.gst || "0") -
-          parseFloat(formData.be || "0") -
-          parseFloat(formData.tds2 || "0") -
-          parseFloat(formData.tds01 || "0") -
-          parseFloat(formData.dalla || "0")
-        ).toFixed(2)
+        parseFloat(sTotal || "0") +
+        parseFloat(formData.gst || "0") -
+        parseFloat(formData.be || "0") -
+        parseFloat(formData.tds2 || "0") -
+        parseFloat(formData.tds01 || "0") -
+        parseFloat(formData.dalla || "0")
+      ).toFixed(2)
       : "0.00";
 
   const endTotal = (parseFloat(formData.amount) || 0) - parseFloat(grandTotal);
@@ -130,7 +132,7 @@ const BillGenerator = ({ onLogout }) => {
   const getNextInput = (currentInput) => {
     const currentIndex = navigationOrder.indexOf(currentInput.id);
     if (currentIndex === -1) return null;
-    
+
     const nextIndex = (currentIndex + 1) % navigationOrder.length;
     const nextId = navigationOrder[nextIndex];
     return inputRefs.current.find(ref => ref?.id === nextId);
@@ -140,7 +142,7 @@ const BillGenerator = ({ onLogout }) => {
   const getPrevInput = (currentInput) => {
     const currentIndex = navigationOrder.indexOf(currentInput.id);
     if (currentIndex === -1) return null;
-    
+
     const prevIndex = (currentIndex - 1 + navigationOrder.length) % navigationOrder.length;
     const prevId = navigationOrder[prevIndex];
     return inputRefs.current.find(ref => ref?.id === prevId);
@@ -316,14 +318,22 @@ const BillGenerator = ({ onLogout }) => {
   // };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-[2000px] mx-auto p-2 mx-8">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 transition-colors duration-300">
+      <div className="w-full p-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 mt-8">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-800 mb-2">
-              Bill Generator
-            </h1>
+        <div className="flex items-center justify-between mb-8 mt-8 pb-4">
+          <div className="flex items-center gap-6">
+            <div
+              className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+              onMouseEnter={() => setOpen(true)}
+            >
+              <SidebarTrigger className="h-6 w-6 text-zinc-700 dark:text-zinc-200" />
+            </div>
+            <div className="h-8 w-px bg-zinc-300 dark:bg-zinc-700"></div>
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">SCRAP BILL</h1>
+              <p className="text-zinc-500 dark:text-zinc-400 text-sm">Manage and generate scrap bills</p>
+            </div>
           </div>
 
           <div className="flex gap-4">
@@ -331,7 +341,7 @@ const BillGenerator = ({ onLogout }) => {
               onClick={handleReset}
               variant="outline"
               size="default"
-              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-base px-6 py-2 h-auto"
+              className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-base px-6 py-2 h-auto"
             >
               <RotateCcw size={20} className="mr-2" />
               Reset
@@ -349,10 +359,11 @@ const BillGenerator = ({ onLogout }) => {
         </div>
 
         {/* Main Content Grid - 3 large columns */}
+        {/* Main Content Grid - 3 large columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
           {/* Left Column - Basic Information */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[630px] rounded-lg border border-slate-300">
-            <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
+          <Card className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-lg h-[630px] rounded-lg">
+            <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <FileText size={18} />
                 Basic Information
@@ -362,7 +373,7 @@ const BillGenerator = ({ onLogout }) => {
               <div className="space-y-3">
                 <Label
                   htmlFor="partyName"
-                  className="text-slate-700 font-semibold text-sm"
+                  className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                 >
                   Party Name *
                 </Label>
@@ -373,7 +384,7 @@ const BillGenerator = ({ onLogout }) => {
                   value={formData.partyName}
                   onChange={(e) => updateFormData("partyName", e.target.value)}
                   placeholder="Enter party name"
-                  className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                  className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                 />
               </div>
 
@@ -381,7 +392,7 @@ const BillGenerator = ({ onLogout }) => {
                 <div className="space-y-3">
                   <Label
                     htmlFor="billNumber"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Bill Number
                   </Label>
@@ -392,13 +403,13 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.billNumber}
                     onChange={(e) => updateFormData("billNumber", e.target.value)}
                     placeholder="Enter bill number"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
                 <div className="space-y-3">
                   <Label
                     htmlFor="amount"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Bill Amount
                   </Label>
@@ -409,7 +420,7 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.amount}
                     onChange={(e) => updateFormData("amount", e.target.value)}
                     placeholder="0.00"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
               </div>
@@ -417,7 +428,7 @@ const BillGenerator = ({ onLogout }) => {
               <div className="space-y-3">
                 <Label
                   htmlFor="bill"
-                  className="text-slate-700 font-semibold text-sm"
+                  className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                 >
                   Basic Price
                 </Label>
@@ -428,7 +439,7 @@ const BillGenerator = ({ onLogout }) => {
                   value={formData.bill}
                   onChange={(e) => updateFormData("bill", e.target.value)}
                   placeholder="0.00"
-                  className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                  className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                 />
               </div>
 
@@ -436,7 +447,7 @@ const BillGenerator = ({ onLogout }) => {
                 <div className="space-y-3">
                   <Label
                     htmlFor="quanrev"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Quantity Received
                   </Label>
@@ -447,13 +458,13 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.quanrev}
                     onChange={(e) => updateFormData("quanrev", e.target.value)}
                     placeholder="0"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
                 <div className="space-y-3">
                   <Label
                     htmlFor="dust"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Dust
                   </Label>
@@ -464,15 +475,15 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.dust}
                     onChange={(e) => updateFormData("dust", e.target.value)}
                     placeholder="0"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
               </div>
 
               {totalQuantity >= 0 && (
-                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm text-slate-700">
-                    <strong className="text-slate-800">Final Weight:</strong>{" "}
+                <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                    <strong className="text-zinc-800 dark:text-white">Final Weight:</strong>{" "}
                     {formData.quanrev ? formData.quanrev : 0} - {formData.dust ? formData.dust : 0} ={" "}
                     <span className="font-bold text-orange-600 text-base">
                       {totalQuantity}
@@ -485,7 +496,7 @@ const BillGenerator = ({ onLogout }) => {
                 <div className="space-y-3">
                   <Label
                     htmlFor="date"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Date *
                   </Label>
@@ -496,13 +507,13 @@ const BillGenerator = ({ onLogout }) => {
                     onKeyDown={(e) => handleKeyDown(e, 6)}
                     value={formData.date}
                     onChange={(e) => updateFormData("date", e.target.value)}
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
                 <div className="space-y-3">
                   <Label
                     htmlFor="vehicleNumber"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Vehicle Number *
                   </Label>
@@ -515,7 +526,7 @@ const BillGenerator = ({ onLogout }) => {
                       updateFormData("vehicleNumber", e.target.value)
                     }
                     placeholder="Enter vehicle number"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
               </div>
@@ -524,8 +535,8 @@ const BillGenerator = ({ onLogout }) => {
           </Card>
 
           {/* Middle Column - Financial Details */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[630px] rounded-lg border border-slate-300">
-            <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
+          <Card className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-lg h-[630px] rounded-lg">
+            <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Calculator size={18} />
                 Financial Details
@@ -536,7 +547,7 @@ const BillGenerator = ({ onLogout }) => {
                 <div className="space-y-3">
                   <Label
                     htmlFor="gst"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     GST
                   </Label>
@@ -547,13 +558,13 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.gst}
                     onChange={(e) => updateFormData("gst", e.target.value)}
                     placeholder="0.00"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
                 <div className="space-y-3">
                   <Label
                     htmlFor="tds2"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     TDS (2%)
                   </Label>
@@ -564,7 +575,7 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.tds2}
                     onChange={(e) => updateFormData("tds2", e.target.value)}
                     placeholder="0.00"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
               </div>
@@ -573,7 +584,7 @@ const BillGenerator = ({ onLogout }) => {
                 <div className="space-y-3">
                   <Label
                     htmlFor="tds01"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     TDS (0.1%)
                   </Label>
@@ -584,13 +595,13 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.tds01}
                     onChange={(e) => updateFormData("tds01", e.target.value)}
                     placeholder="0.00"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
                 <div className="space-y-3">
                   <Label
                     htmlFor="be"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Billing Excess
                   </Label>
@@ -601,7 +612,7 @@ const BillGenerator = ({ onLogout }) => {
                     value={formData.be}
                     onChange={(e) => updateFormData("be", e.target.value)}
                     placeholder="0.00"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
               </div>
@@ -609,7 +620,7 @@ const BillGenerator = ({ onLogout }) => {
               <div className="space-y-3">
                 <Label
                   htmlFor="dalla"
-                  className="text-slate-700 font-semibold text-sm"
+                  className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                 >
                   Dalla
                 </Label>
@@ -620,18 +631,18 @@ const BillGenerator = ({ onLogout }) => {
                   value={formData.dalla}
                   onChange={(e) => updateFormData("dalla", e.target.value)}
                   placeholder="0.00"
-                  className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                  className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                 />
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm text-slate-700 font-medium">Dhara (1.5%)</span>
+                    <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Dhara (1.5%)</span>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
                         checked={includeDhara}
                         onChange={() => setIncludeDhara(!includeDhara)}
                       />
@@ -644,14 +655,14 @@ const BillGenerator = ({ onLogout }) => {
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm text-slate-700 font-medium">Bank Charges</span>
+                    <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Bank Charges</span>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
                         checked={includeBankCharges}
                         onChange={() => setIncludeBankCharges(!includeBankCharges)}
                       />
@@ -667,8 +678,8 @@ const BillGenerator = ({ onLogout }) => {
           </Card>
 
           {/* Right Column - Add Items */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[630px] flex flex-col rounded-lg border border-slate-300">
-            <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
+          <Card className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 shadow-lg h-[630px] flex flex-col rounded-lg border border-zinc-300 dark:border-zinc-700">
+            <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Plus size={18} />
                 Add Items ({items.length})
@@ -680,7 +691,7 @@ const BillGenerator = ({ onLogout }) => {
                 <div className="space-y-3">
                   <Label
                     htmlFor="quantity"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Quantity
                   </Label>
@@ -691,13 +702,13 @@ const BillGenerator = ({ onLogout }) => {
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     placeholder="Enter quantity"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
                 <div className="space-y-3">
                   <Label
                     htmlFor="price"
-                    className="text-slate-700 font-semibold text-sm"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
                   >
                     Price
                   </Label>
@@ -708,14 +719,14 @@ const BillGenerator = ({ onLogout }) => {
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder="Enter price"
-                    className="bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
                   />
                 </div>
               </div>
 
               <Button
                 onClick={handleAddItem}
-                className="w-full bg-green-600 hover:bg-green-700 text-base h-10 mb-6"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-base h-10 mb-6"
                 disabled={!quantity || !price}
               >
                 <Plus size={18} className="mr-2" />
@@ -725,7 +736,7 @@ const BillGenerator = ({ onLogout }) => {
               {/* Items List with fixed header and scrollable content */}
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-800">
+                  <h3 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">
                     Items Added
                   </h3>
                   {items.length > 0 && (
@@ -736,36 +747,36 @@ const BillGenerator = ({ onLogout }) => {
                 </div>
 
                 {items.length === 0 ? (
-                  <div className="p-6 text-center border-2 border-dashed border-slate-300 rounded-lg">
-                    <div className="text-slate-400 mb-3">
-                      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center text-xl">
+                  <div className="p-6 text-center border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
+                    <div className="text-zinc-400 dark:text-zinc-500 mb-3">
+                      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xl">
                         📋
                       </div>
                     </div>
-                    <p className="text-slate-500 text-sm">No items added yet</p>
+                    <p className="text-zinc-500 text-sm">No items added yet</p>
                   </div>
                 ) : (
-                  <div className="h-[200px] overflow-y-auto bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <div className="h-[200px] overflow-y-auto bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4">
                     <div className="space-y-3">
                       {items.map((item, index) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200 hover:shadow-sm transition-shadow"
+                          className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-sm transition-shadow"
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-4">
-                              <span className="text-slate-500 font-medium text-sm">
+                              <span className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
                                 #{index + 1}
                               </span>
-                              <div className="text-slate-800">
+                              <div className="text-zinc-800 dark:text-zinc-100">
                                 <span className="font-semibold text-base">
                                   {item.quantity}
                                 </span>
-                                <span className="text-slate-500 mx-2">×</span>
+                                <span className="text-zinc-500 mx-2">×</span>
                                 <span className="font-semibold text-base">
                                   ₹{item.price}
                                 </span>
-                                <span className="text-slate-500 mx-2">=</span>
+                                <span className="text-zinc-500 mx-2">=</span>
                                 <span className="font-bold text-orange-600 text-base">
                                   ₹{item.total.toFixed(2)}
                                 </span>

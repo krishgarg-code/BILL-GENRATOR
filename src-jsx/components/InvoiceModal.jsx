@@ -125,7 +125,7 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
         </div>
 
         {/* Invoice Content */}
-        <div id="invoice-section" className="p-8 bg-white">
+        <div id="invoice-section" className="p-8 bg-white text-black">
           {/* Company Header */}
           <div className="text-center mb-8">
             {/* <h1 className="text-3xl font-bold text-gray-800 mb-2">INVOICE</h1> */}
