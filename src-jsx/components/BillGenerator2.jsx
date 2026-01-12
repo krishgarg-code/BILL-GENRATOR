@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Calculator, FileText, Plus, RotateCcw, Trash2, LogOut } from "lucide-react";
+import { Calculator, FileText, Plus, RotateCcw, Trash2, LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,16 +7,25 @@ import { Label } from "@/components/ui/label";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
 import InvoiceModal2 from "./InvoiceModal2";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const BillGenerator2 = ({ onLogout }) => {
     const { toast } = useToast();
     const { setOpen } = useSidebar();
 
-    // Form state
-    const [formData, setFormData] = useState({
+    const initialFormData = {
         partyName: "",
+        billTo: "",
         date: "",
         vehicleNumber: "",
+        billNumber: "",
         billNumber: "",
         amount: "",
         bill: "",
@@ -27,16 +36,26 @@ const BillGenerator2 = ({ onLogout }) => {
         tds01: "",
         be: "",
         dalla: "",
-    });
+    };
+
+    // Form state
+    const [billsPerPage, setBillsPerPage] = useState(1);
+    const [currentBillIndex, setCurrentBillIndex] = useState(0);
+    const [bills, setBills] = useState([
+        { id: Date.now(), formData: { ...initialFormData }, items: [] }
+    ]);
 
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
-    const [items, setItems] = useState([]);
     const [showInvoice, setShowInvoice] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [savedDrafts, setSavedDrafts] = useState([]);
     const [includeDhara, setIncludeDhara] = useState(true);
     const [includeBankCharges, setIncludeBankCharges] = useState(true);
+
+    const currentBill = bills[currentBillIndex] || bills[0];
+    const formData = currentBill.formData;
+    const items = currentBill.items;
 
     // Refs for keyboard navigation
     const inputRefs = useRef([]);
@@ -48,18 +67,25 @@ const BillGenerator2 = ({ onLogout }) => {
 
     // Load saved data on mount
     useEffect(() => {
-        const savedData = localStorage.getItem("billGenerator2_formData");
-        const savedItems = localStorage.getItem("billGenerator2_items");
-        const drafts = localStorage.getItem("billGenerator2_drafts");
+        const savedBills = localStorage.getItem("billGenerator2_bills");
+        const savedBillsPerPage = localStorage.getItem("billGenerator2_billsPerPage");
 
-        if (savedData) {
-            setFormData(JSON.parse(savedData));
+        if (savedBills) {
+            setBills(JSON.parse(savedBills));
+        } else {
+            const savedData = localStorage.getItem("billGenerator2_formData");
+            const savedItems = localStorage.getItem("billGenerator2_items");
+            if (savedData || savedItems) {
+                setBills([{
+                    id: Date.now(),
+                    formData: savedData ? JSON.parse(savedData) : { ...initialFormData },
+                    items: savedItems ? JSON.parse(savedItems) : []
+                }]);
+            }
         }
-        if (savedItems) {
-            setItems(JSON.parse(savedItems));
-        }
-        if (drafts) {
-            setSavedDrafts(JSON.parse(drafts));
+
+        if (savedBillsPerPage) {
+            setBillsPerPage(parseInt(savedBillsPerPage));
         }
 
         // Focus first input
@@ -70,12 +96,9 @@ const BillGenerator2 = ({ onLogout }) => {
 
     // Auto-save to localStorage
     useEffect(() => {
-        localStorage.setItem("billGenerator2_formData", JSON.stringify(formData));
-    }, [formData]);
-
-    useEffect(() => {
-        localStorage.setItem("billGenerator2_items", JSON.stringify(items));
-    }, [items]);
+        localStorage.setItem("billGenerator2_bills", JSON.stringify(bills));
+        localStorage.setItem("billGenerator2_billsPerPage", billsPerPage.toString());
+    }, [bills, billsPerPage]);
 
     // Calculations
     const totalQuantity =
@@ -106,26 +129,75 @@ const BillGenerator2 = ({ onLogout }) => {
 
     // Form handlers
     const updateFormData = (field, value) => {
-        setFormData((prev) => ({ ...prev, [field]: value }));
+        setBills(prev => {
+            const newBills = [...prev];
+            newBills[currentBillIndex] = {
+                ...newBills[currentBillIndex],
+                formData: {
+                    ...newBills[currentBillIndex].formData,
+                    [field]: value
+                }
+            };
+            return newBills;
+        });
+    };
+
+    // Bill Management Handlers
+    const handleBillsPerPageChange = (count) => {
+        setBillsPerPage(count);
+    };
+
+    const handleAddBill = () => {
+        if (bills.length >= billsPerPage) {
+            toast({
+                title: "Limit Reached",
+                description: `You can only have ${billsPerPage} bills per page.`,
+                variant: "destructive",
+                duration: 1000,
+            });
+            return;
+        }
+        setBills(prev => [
+            ...prev,
+            { id: Date.now(), formData: { ...initialFormData }, items: [] }
+        ]);
+        setCurrentBillIndex(bills.length); // Switch to new bill
+    };
+
+    const handleDeleteBill = (index) => {
+        if (bills.length <= 1) return;
+
+        const newBills = bills.filter((_, i) => i !== index);
+        setBills(newBills);
+
+        if (currentBillIndex >= newBills.length) {
+            setCurrentBillIndex(newBills.length - 1);
+        }
+        toast({
+            title: "Bill Deleted",
+            description: "Bill has been removed.",
+            duration: 1000,
+        });
     };
 
     // Define the exact navigation order based on field IDs
     const navigationOrder = [
         'partyName',    // 0
-        'billNumber',   // 1
-        'amount',       // 2
-        'bill',         // 3 (basic price)
-        'quanrev',      // 4 (quantity received)
-        'dust',         // 5
-        'date',         // 6
-        'vehicleNumber',// 7
-        'gst',         // 8
-        'tds2',        // 9 (TDS 2%)
-        'tds01',       // 10 (TDS 0.1%)
-        'be',          // 11 (Billing Excess)
-        'dalla',       // 12
-        'quantity',    // 13
-        'price'        // 14
+        'billTo',       // 1
+        'billNumber',   // 2
+        'amount',       // 3
+        'bill',         // 4 (basic price)
+        'quanrev',      // 5 (quantity received)
+        'dust',         // 6
+        'date',         // 7
+        'vehicleNumber',// 8
+        'gst',         // 9
+        'tds2',        // 10 (TDS 2%)
+        'tds01',       // 11 (TDS 0.1%)
+        'be',          // 12 (Billing Excess)
+        'dalla',       // 13
+        'quantity',    // 14
+        'price'        // 15
     ];
 
     // Function to get the next input field
@@ -149,9 +221,9 @@ const BillGenerator2 = ({ onLogout }) => {
     };
 
     // Keyboard navigation
-    const handleKeyDown = (e, index) => {
+    const handleKeyDown = (e) => {
         // Get the current input element
-        const currentInput = inputRefs.current[index];
+        const currentInput = e.currentTarget;
         if (!currentInput) return;
 
         // Handle Ctrl+Enter to generate invoice
@@ -183,11 +255,6 @@ const BillGenerator2 = ({ onLogout }) => {
             prevInput?.focus();
             return;
         }
-
-        if (e.ctrlKey && e.key === "s") {
-            e.preventDefault();
-            handleSaveDraft();
-        }
     };
 
     // Item management
@@ -214,7 +281,15 @@ const BillGenerator2 = ({ onLogout }) => {
             total: parseFloat(quantity) * parseFloat(price),
         };
 
-        setItems((prev) => [...prev, newItem]);
+        setBills(prev => {
+            const newBills = [...prev];
+            newBills[currentBillIndex] = {
+                ...newBills[currentBillIndex],
+                items: [...newBills[currentBillIndex].items, newItem]
+            };
+            return newBills;
+        });
+
         setQuantity("");
         setPrice("");
 
@@ -223,10 +298,24 @@ const BillGenerator2 = ({ onLogout }) => {
             description: `Added ${quantity} × ₹${price} = ₹${newItem.total.toFixed(2)}`,
             duration: 1000,
         });
+
+        // Reset focus to quantity input
+        setTimeout(() => {
+            const qtyInput = inputRefs.current.find(ref => ref?.id === 'quantity');
+            qtyInput?.focus();
+        }, 0);
     };
 
-    const handleDeleteItem = (id) => {
-        setItems((prev) => prev.filter((item) => item.id !== id));
+    const handleDeleteItem = (itemId) => {
+        setBills(prev => {
+            const newBills = [...prev];
+            newBills[currentBillIndex] = {
+                ...newBills[currentBillIndex],
+                items: newBills[currentBillIndex].items.filter(item => item.id !== itemId)
+            };
+            return newBills;
+        });
+
         toast({
             title: "Item Removed",
             description: "Item has been removed from the bill",
@@ -236,16 +325,16 @@ const BillGenerator2 = ({ onLogout }) => {
 
     // Generate invoice
     const handleGenerate = () => {
-        if (
-            !formData.partyName ||
-            !formData.date ||
-            !formData.vehicleNumber ||
-            items.length === 0
-        ) {
+        // Simplified validation: check if CURRENT bill has minimum info
+        // We could loop through all bills, but let's just warn about the current one if it's being edited.
+        // Actually, let's just check if there is ANY valid bill to print.
+        const validBills = bills.filter(b => b.formData.partyName && b.items.length > 0);
+
+        if (validBills.length === 0) {
             toast({
                 title: "Missing Information",
                 description:
-                    "Please fill all required fields and add at least one item",
+                    `Please ensure at least one bill has Party Name and Items.`,
                 variant: "destructive",
                 duration: 1000,
             });
@@ -255,33 +344,24 @@ const BillGenerator2 = ({ onLogout }) => {
     };
 
     // Reset form
+    // Reset form
     const handleReset = () => {
-        setFormData({
-            partyName: "",
-            date: "",
-            vehicleNumber: "",
-            billNumber: "",
-            bill: "",
-            amount: "",
-            quanrev: "",
-            dust: "",
-            gst: "",
-            tds2: "",
-            tds01: "",
-            be: "",
-            dalla: "",
-        });
-        setQuantity("");
-        setPrice("");
-        setItems([]);
-        localStorage.removeItem("billGenerator2_formData");
-        localStorage.removeItem("billGenerator2_items");
+        if (confirm("Reset ALL data? This will clear all bills.")) {
+            // Reset to initial state: 1 bill, empty
+            setBills([{ id: Date.now(), formData: { ...initialFormData }, items: [] }]);
+            setCurrentBillIndex(0);
+            setBillsPerPage(1);
+            setQuantity("");
+            setPrice("");
+            localStorage.removeItem("billGenerator2_bills");
+            localStorage.removeItem("billGenerator2_billsPerPage");
 
-        toast({
-            title: "Form Reset",
-            description: "All fields have been cleared",
-            duration: 1000,
-        });
+            toast({
+                title: "Form Reset",
+                description: "All fields have been cleared",
+                duration: 1000,
+            });
+        }
     };
 
     // // Save draft
@@ -321,40 +401,99 @@ const BillGenerator2 = ({ onLogout }) => {
         <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 transition-colors duration-300">
             <div className="w-full p-4">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8 mt-8 pb-4">
-                    <div className="flex items-center gap-6">
-                        <div
-                            className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                            onMouseEnter={() => setOpen(true)}
-                        >
-                            <SidebarTrigger className="h-6 w-6 text-zinc-700 dark:text-zinc-200" />
+                <div className="flex flex-col gap-6 mb-8 mt-8 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-6">
+                            <div
+                                className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                                onMouseEnter={() => setOpen(true)}
+                            >
+                                <SidebarTrigger className="h-6 w-6 text-zinc-700 dark:text-zinc-200" />
+                            </div>
+                            <div className="h-8 w-px bg-zinc-300 dark:bg-zinc-700"></div>
+                            <div>
+                                <h1 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">INGOT BILL</h1>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-sm">Manage and generate ingot bills</p>
+                            </div>
                         </div>
-                        <div className="h-8 w-px bg-zinc-300 dark:bg-zinc-700"></div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">INGOT BILL</h1>
-                            <p className="text-zinc-500 dark:text-zinc-400 text-sm">Manage and generate ingot bills</p>
+
+                        <div className="flex gap-4">
+                            <Button
+                                onClick={handleReset}
+                                variant="outline"
+                                size="default"
+                                className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-base px-6 py-2 h-auto"
+                            >
+                                <RotateCcw size={20} className="mr-2" />
+                                Reset
+                            </Button>
+
+                            <Button
+                                onClick={handleGenerate}
+                                size="default"
+                                className="bg-[#00963C] hover:bg-[#007a30] text-base px-6 py-2 h-auto"
+                            >
+                                <FileText size={20} className="mr-2" />
+                                Generate Bill
+                            </Button>
                         </div>
                     </div>
 
-                    <div className="flex gap-4">
-                        <Button
-                            onClick={handleReset}
-                            variant="outline"
-                            size="default"
-                            className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-base px-6 py-2 h-auto"
-                        >
-                            <RotateCcw size={20} className="mr-2" />
-                            Reset
-                        </Button>
+                    {/* Multi-Bill Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <Label className="text-zinc-600 dark:text-zinc-400">Bills per Page:</Label>
+                                <Select
+                                    value={billsPerPage.toString()}
+                                    onValueChange={(val) => handleBillsPerPageChange(parseInt(val))}
+                                >
+                                    <SelectTrigger className="w-[100px] h-9 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700">
+                                        <SelectValue placeholder="1" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">1 Bill</SelectItem>
+                                        <SelectItem value="2">2 Bills</SelectItem>
+                                        <SelectItem value="4">4 Bills</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                        <Button
-                            onClick={handleGenerate}
-                            size="default"
-                            className="bg-[#00963C] hover:bg-[#007a30] text-base px-6 py-2 h-auto"
-                        >
-                            <FileText size={20} className="mr-2" />
-                            Generate Bill
-                        </Button>
+                            <Tabs value={currentBillIndex.toString()} onValueChange={(val) => setCurrentBillIndex(parseInt(val))} className="w-auto">
+                                <TabsList className="bg-zinc-100 dark:bg-zinc-800">
+                                    {bills.map((bill, index) => (
+                                        <TabsTrigger
+                                            key={bill.id}
+                                            value={index.toString()}
+                                            className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-700"
+                                        >
+                                            Bill {index + 1}
+                                            {bills.length > 1 && (
+                                                <span
+                                                    className="ml-2 hover:text-red-500 cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteBill(index);
+                                                    }}
+                                                >
+                                                    <X size={14} />
+                                                </span>
+                                            )}
+                                        </TabsTrigger>
+                                    ))}
+                                </TabsList>
+                            </Tabs>
+
+                            <Button
+                                onClick={handleAddBill}
+                                disabled={bills.length >= billsPerPage}
+                                size="sm"
+                                variant="secondary"
+                                className="h-9"
+                            >
+                                <Plus size={16} className="mr-1" /> Add Bill
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -369,22 +508,41 @@ const BillGenerator2 = ({ onLogout }) => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-4">
-                            <div className="space-y-3">
-                                <Label
-                                    htmlFor="partyName"
-                                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                                >
-                                    Party Name *
-                                </Label>
-                                <Input
-                                    id="partyName"
-                                    ref={addInputRef}
-                                    onKeyDown={(e) => handleKeyDown(e, 0)}
-                                    value={formData.partyName}
-                                    onChange={(e) => updateFormData("partyName", e.target.value)}
-                                    placeholder="Enter party name"
-                                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-[#00963C] focus:ring-[#00963C]/20 text-sm h-10"
-                                />
+                            <div className="flex gap-4">
+                                <div className="space-y-3 flex-1">
+                                    <Label
+                                        htmlFor="partyName"
+                                        className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                                    >
+                                        Bill From *
+                                    </Label>
+                                    <Input
+                                        id="partyName"
+                                        ref={addInputRef}
+                                        onKeyDown={handleKeyDown}
+                                        value={formData.partyName}
+                                        onChange={(e) => updateFormData("partyName", e.target.value)}
+                                        placeholder="Enter sender name"
+                                        className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-[#00963C] focus:ring-[#00963C]/20 text-sm h-10"
+                                    />
+                                </div>
+                                <div className="space-y-3 flex-1">
+                                    <Label
+                                        htmlFor="billTo"
+                                        className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                                    >
+                                        Bill To
+                                    </Label>
+                                    <Input
+                                        id="billTo"
+                                        ref={addInputRef}
+                                        onKeyDown={handleKeyDown}
+                                        value={formData.billTo || ""}
+                                        onChange={(e) => updateFormData("billTo", e.target.value)}
+                                        placeholder="Enter receiver name"
+                                        className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-[#00963C] focus:ring-[#00963C]/20 text-sm h-10"
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-6">
@@ -398,7 +556,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="billNumber"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 1)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.billNumber}
                                         onChange={(e) => updateFormData("billNumber", e.target.value)}
                                         placeholder="Enter bill number"
@@ -415,7 +573,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="amount"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 2)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.amount}
                                         onChange={(e) => updateFormData("amount", e.target.value)}
                                         placeholder="0.00"
@@ -434,7 +592,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                 <Input
                                     id="bill"
                                     ref={addInputRef}
-                                    onKeyDown={(e) => handleKeyDown(e, 3)}
+                                    onKeyDown={handleKeyDown}
                                     value={formData.bill}
                                     onChange={(e) => updateFormData("bill", e.target.value)}
                                     placeholder="0.00"
@@ -453,7 +611,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="quanrev"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 4)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.quanrev}
                                         onChange={(e) => updateFormData("quanrev", e.target.value)}
                                         placeholder="0"
@@ -470,7 +628,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="dust"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 5)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.dust}
                                         onChange={(e) => updateFormData("dust", e.target.value)}
                                         placeholder="0"
@@ -503,7 +661,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                         id="date"
                                         type="date"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 6)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.date}
                                         onChange={(e) => updateFormData("date", e.target.value)}
                                         className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-[#00963C] focus:ring-[#00963C]/20 text-sm h-10"
@@ -519,7 +677,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="vehicleNumber"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 7)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.vehicleNumber}
                                         onChange={(e) =>
                                             updateFormData("vehicleNumber", e.target.value)
@@ -553,7 +711,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="gst"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 8)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.gst}
                                         onChange={(e) => updateFormData("gst", e.target.value)}
                                         placeholder="0.00"
@@ -570,7 +728,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="tds2"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 9)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.tds2}
                                         onChange={(e) => updateFormData("tds2", e.target.value)}
                                         placeholder="0.00"
@@ -590,7 +748,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="tds01"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 10)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.tds01}
                                         onChange={(e) => updateFormData("tds01", e.target.value)}
                                         placeholder="0.00"
@@ -607,7 +765,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="be"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 11)}
+                                        onKeyDown={handleKeyDown}
                                         value={formData.be}
                                         onChange={(e) => updateFormData("be", e.target.value)}
                                         placeholder="0.00"
@@ -626,7 +784,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                 <Input
                                     id="dalla"
                                     ref={addInputRef}
-                                    onKeyDown={(e) => handleKeyDown(e, 12)}
+                                    onKeyDown={handleKeyDown}
                                     value={formData.dalla}
                                     onChange={(e) => updateFormData("dalla", e.target.value)}
                                     placeholder="0.00"
@@ -697,7 +855,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="quantity"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 13)}
+                                        onKeyDown={handleKeyDown}
                                         value={quantity}
                                         onChange={(e) => setQuantity(e.target.value)}
                                         placeholder="Enter quantity"
@@ -714,7 +872,7 @@ const BillGenerator2 = ({ onLogout }) => {
                                     <Input
                                         id="price"
                                         ref={addInputRef}
-                                        onKeyDown={(e) => handleKeyDown(e, 14)}
+                                        onKeyDown={handleKeyDown}
                                         value={price}
                                         onChange={(e) => setPrice(e.target.value)}
                                         placeholder="Enter price"
@@ -839,16 +997,9 @@ const BillGenerator2 = ({ onLogout }) => {
                 {/* Invoice Modal */}
                 {showInvoice && (
                     <InvoiceModal2
-                        formData={{ ...formData, includeDhara, includeBankCharges }}
-                        items={items}
-                        calculations={{
-                            itemTotal,
-                            OPFP,
-                            grandTotal,
-                            endTotal,
-                            totalQuantity,
-                            bankCharges,
-                        }}
+                        bills={bills}
+                        billsPerPage={billsPerPage}
+                        globalSettings={{ includeDhara, includeBankCharges }}
                         onClose={() => setShowInvoice(false)}
                     />
                 )}
