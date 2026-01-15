@@ -6,6 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import InvoiceModal from "./InvoiceModal";
 
 const BillGenerator = ({ onLogout }) => {
@@ -13,28 +21,40 @@ const BillGenerator = ({ onLogout }) => {
   const { setOpen } = useSidebar();
 
   // Form state
-  const [formData, setFormData] = useState({
-    partyName: "",
-    date: "",
-    vehicleNumber: "",
-    billNumber: "",
-    amount: "",
-    bill: "",
-    quanrev: "",
-    dust: "",
-    gst: "",
-    tds2: "",
-    tds01: "",
-    be: "",
-    dalla: "",
+  // New Multi-Bill Logic
+  const [billsPerPage, setBillsPerPage] = useState(1);
+  const [currentBillIndex, setCurrentBillIndex] = useState(0);
+
+  const createEmptyBill = (id) => ({
+    id: id || Date.now().toString(),
+    formData: {
+      partyName: "",
+      date: "",
+      vehicleNumber: "",
+      billNumber: "",
+      amount: "",
+      bill: "",
+      quanrev: "",
+      dust: "",
+      gst: "",
+      tds2: "",
+      tds01: "",
+      be: "",
+      dalla: "",
+    },
+    items: [],
   });
+
+  const [bills, setBills] = useState([createEmptyBill("1")]);
+
+  // Derived state for current bill
+  const currentBill = bills[currentBillIndex] || bills[0];
+  const formData = currentBill?.formData || createEmptyBill().formData;
+  const items = currentBill?.items || [];
 
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
-  const [items, setItems] = useState([]);
   const [showInvoice, setShowInvoice] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
-  const [savedDrafts, setSavedDrafts] = useState([]);
   const [includeDhara, setIncludeDhara] = useState(true);
   const [includeBankCharges, setIncludeBankCharges] = useState(true);
 
@@ -46,40 +66,31 @@ const BillGenerator = ({ onLogout }) => {
     }
   };
 
-  // Load saved data on mount
-  useEffect(() => {
-    const savedData = localStorage.getItem("billGenerator_formData");
-    const savedItems = localStorage.getItem("billGenerator_items");
-    const drafts = localStorage.getItem("billGenerator_drafts");
 
-    if (savedData) {
-      setFormData(JSON.parse(savedData));
-    }
-    if (savedItems) {
-      setItems(JSON.parse(savedItems));
-    }
-    if (drafts) {
-      setSavedDrafts(JSON.parse(drafts));
-    }
-
-    // Focus first input
-    setTimeout(() => {
-      inputRefs.current[0]?.focus();
-    }, 100);
-  }, []);
 
   // Auto-save to localStorage
   useEffect(() => {
-    localStorage.setItem("billGenerator_formData", JSON.stringify(formData));
-  }, [formData]);
+    if (bills.length > 0) {
+      localStorage.setItem("billGenerator_bills", JSON.stringify(bills));
+      localStorage.setItem("billGenerator_billsPerPage", billsPerPage.toString());
+    }
+  }, [bills, billsPerPage]);
 
   useEffect(() => {
-    localStorage.setItem("billGenerator_items", JSON.stringify(items));
-  }, [items]);
+    // Try to load saved bills on mount
+    const savedBills = localStorage.getItem("billGenerator_bills");
+    const savedLimit = localStorage.getItem("billGenerator_billsPerPage");
+    if (savedBills) {
+      try {
+        const parsed = JSON.parse(savedBills);
+        if (Array.isArray(parsed)) setBills(parsed);
+      } catch (e) { console.error(e); }
+    }
+    if (savedLimit) setBillsPerPage(parseInt(savedLimit));
+  }, []);
 
-  // Calculations
-  const totalQuantity =
-    (parseFloat(formData.quanrev) || 0) - (parseFloat(formData.dust) || 0);
+  // Calculations derived from current bill
+  const totalQuantity = (parseFloat(formData.quanrev) || 0) - (parseFloat(formData.dust) || 0);
   const itemTotal = items.reduce((acc, item) => acc + item.total, 0);
   const OPFP = includeDhara ? (itemTotal * 0.015).toFixed(0) : 0;
   const bankCharges = includeBankCharges ? 67 : 0;
@@ -105,8 +116,42 @@ const BillGenerator = ({ onLogout }) => {
   const endTotal = (parseFloat(formData.amount) || 0) - parseFloat(grandTotal);
 
   // Form handlers
+  const handleBillsPerPageChange = (newCount) => {
+    setBillsPerPage(newCount);
+    setBills((prev) => {
+      const currentLength = prev.length;
+      if (newCount > currentLength) {
+        // Add new bills
+        const newBills = [...prev];
+        for (let i = currentLength; i < newCount; i++) {
+          newBills.push(createEmptyBill(Date.now().toString() + i));
+        }
+        return newBills;
+      } else if (newCount < currentLength) {
+        // Trim bills
+        const newBills = prev.slice(0, newCount);
+        if (currentBillIndex >= newCount) {
+          setCurrentBillIndex(0);
+        }
+        return newBills;
+      }
+      return prev;
+    });
+  };
+
   const updateFormData = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setBills((prev) => {
+      const newBills = [...prev];
+      if (!newBills[currentBillIndex]) return prev;
+      newBills[currentBillIndex] = {
+        ...newBills[currentBillIndex],
+        formData: {
+          ...newBills[currentBillIndex].formData,
+          [field]: value,
+        },
+      };
+      return newBills;
+    });
   };
 
   // Define the exact navigation order based on field IDs
@@ -214,7 +259,15 @@ const BillGenerator = ({ onLogout }) => {
       total: parseFloat(quantity) * parseFloat(price),
     };
 
-    setItems((prev) => [...prev, newItem]);
+    setBills((prev) => {
+      const newBills = [...prev];
+      if (!newBills[currentBillIndex]) return prev;
+      newBills[currentBillIndex] = {
+        ...newBills[currentBillIndex],
+        items: [...newBills[currentBillIndex].items, newItem],
+      };
+      return newBills;
+    });
     setQuantity("");
     setPrice("");
 
@@ -223,10 +276,23 @@ const BillGenerator = ({ onLogout }) => {
       description: `Added ${quantity} × ₹${price} = ₹${newItem.total.toFixed(2)}`,
       duration: 1000,
     });
+
+    setTimeout(() => {
+      const qtyInput = inputRefs.current.find(el => el?.id === 'quantity');
+      qtyInput?.focus();
+    }, 100);
   };
 
   const handleDeleteItem = (id) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setBills((prev) => {
+      const newBills = [...prev];
+      if (!newBills[currentBillIndex]) return prev;
+      newBills[currentBillIndex] = {
+        ...newBills[currentBillIndex],
+        items: newBills[currentBillIndex].items.filter((item) => item.id !== id),
+      };
+      return newBills;
+    });
     toast({
       title: "Item Removed",
       description: "Item has been removed from the bill",
@@ -236,6 +302,7 @@ const BillGenerator = ({ onLogout }) => {
 
   // Generate invoice
   const handleGenerate = () => {
+    // Validate current bill
     if (
       !formData.partyName ||
       !formData.date ||
@@ -245,7 +312,7 @@ const BillGenerator = ({ onLogout }) => {
       toast({
         title: "Missing Information",
         description:
-          "Please fill all required fields and add at least one item",
+          "Please fill required fields and add at least one item for the current bill",
         variant: "destructive",
         duration: 1000,
       });
@@ -256,66 +323,23 @@ const BillGenerator = ({ onLogout }) => {
 
   // Reset form
   const handleReset = () => {
-    setFormData({
-      partyName: "",
-      date: "",
-      vehicleNumber: "",
-      billNumber: "",
-      bill: "",
-      amount: "",
-      quanrev: "",
-      dust: "",
-      gst: "",
-      tds2: "",
-      tds01: "",
-      be: "",
-      dalla: "",
-    });
-    setQuantity("");
-    setPrice("");
-    setItems([]);
-    localStorage.removeItem("billGenerator_formData");
-    localStorage.removeItem("billGenerator_items");
+    if (confirm("Reset ALL bills?")) {
+      const newBills = Array(billsPerPage).fill(null).map((_, i) => createEmptyBill((i + 1).toString()));
+      setBills(newBills);
+      // setBillsPerPage(billsPerPage); // Keep current per page setting
+      setQuantity("");
+      setPrice("");
+      localStorage.removeItem("billGenerator_bills");
 
-    toast({
-      title: "Form Reset",
-      description: "All fields have been cleared",
-      duration: 1000,
-    });
+      toast({
+        title: "Reset Complete",
+        description: "All bills have been cleared",
+        duration: 1000,
+      });
+    }
   };
 
-  // // Save draft
-  // const handleSaveDraft = () => {
-  //   const draft = {
-  //     id: Date.now().toString(),
-  //     name: `${formData.partyName || "Draft"} - ${new Date().toLocaleDateString()}`,
-  //     formData,
-  //     items,
-  //     createdAt: new Date().toISOString(),
-  //   };
 
-  //   const newDrafts = [...savedDrafts, draft];
-  //   setSavedDrafts(newDrafts);
-  //   localStorage.setItem("billGenerator_drafts", JSON.stringify(newDrafts));
-
-  //   toast({
-  //     title: "Draft Saved",
-  //     description: "Your bill has been saved as a draft",
-  //     duration: 1000,
-  //   });
-  // };
-
-  // // Load draft
-  // const handleLoadDraft = (draft) => {
-  //   setFormData(draft.formData);
-  //   setItems(draft.items);
-
-  //   toast({
-  //     title: "Draft Loaded",
-  //     description: `Loaded draft: ${draft.name}`,
-  //     duration: 1000,
-  //   });
-  // };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 transition-colors duration-300">
@@ -336,7 +360,26 @@ const BillGenerator = ({ onLogout }) => {
             </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            {/* Bills Per Page Selector */}
+            <div className="flex items-center gap-2 mr-2">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Bills/Page:</span>
+              <Select
+                value={billsPerPage.toString()}
+                onValueChange={(val) => handleBillsPerPageChange(parseInt(val))}
+              >
+                <SelectTrigger className="w-[100px] h-9 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700">
+                  <SelectValue placeholder="1" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Bill</SelectItem>
+                  <SelectItem value="2">2 Bills</SelectItem>
+                  <SelectItem value="3">3 Bills</SelectItem>
+                  <SelectItem value="4">4 Bills</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <Button
               onClick={handleReset}
               variant="outline"
@@ -360,446 +403,461 @@ const BillGenerator = ({ onLogout }) => {
 
         {/* Main Content Grid - 3 large columns */}
         {/* Main Content Grid - 3 large columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
-          {/* Left Column - Basic Information */}
-          <Card className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-lg h-[630px] rounded-lg">
-            <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <FileText size={18} />
-                Basic Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="space-y-3">
-                <Label
-                  htmlFor="partyName"
-                  className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                >
-                  Party Name *
-                </Label>
-                <Input
-                  id="partyName"
-                  ref={addInputRef}
-                  onKeyDown={(e) => handleKeyDown(e, 0)}
-                  value={formData.partyName}
-                  onChange={(e) => updateFormData("partyName", e.target.value)}
-                  placeholder="Enter party name"
-                  className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="billNumber"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Bill Number
-                  </Label>
-                  <Input
-                    id="billNumber"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 1)}
-                    value={formData.billNumber}
-                    onChange={(e) => updateFormData("billNumber", e.target.value)}
-                    placeholder="Enter bill number"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="amount"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Bill Amount
-                  </Label>
-                  <Input
-                    id="amount"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 2)}
-                    value={formData.amount}
-                    onChange={(e) => updateFormData("amount", e.target.value)}
-                    placeholder="0.00"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label
-                  htmlFor="bill"
-                  className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                >
-                  Basic Price
-                </Label>
-                <Input
-                  id="bill"
-                  ref={addInputRef}
-                  onKeyDown={(e) => handleKeyDown(e, 3)}
-                  value={formData.bill}
-                  onChange={(e) => updateFormData("bill", e.target.value)}
-                  placeholder="0.00"
-                  className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="quanrev"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Quantity Received
-                  </Label>
-                  <Input
-                    id="quanrev"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 4)}
-                    value={formData.quanrev}
-                    onChange={(e) => updateFormData("quanrev", e.target.value)}
-                    placeholder="0"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="dust"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Dust
-                  </Label>
-                  <Input
-                    id="dust"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 5)}
-                    value={formData.dust}
-                    onChange={(e) => updateFormData("dust", e.target.value)}
-                    placeholder="0"
-                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-              </div>
-
-              {totalQuantity >= 0 && (
-                <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    <strong className="text-zinc-800 dark:text-white">Final Weight:</strong>{" "}
-                    {formData.quanrev ? formData.quanrev : 0} - {formData.dust ? formData.dust : 0} ={" "}
-                    <span className="font-bold text-orange-600 text-base">
-                      {totalQuantity}
-                    </span>
-                  </p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="date"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Date *
-                  </Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 6)}
-                    value={formData.date}
-                    onChange={(e) => updateFormData("date", e.target.value)}
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="vehicleNumber"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Vehicle Number *
-                  </Label>
-                  <Input
-                    id="vehicleNumber"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 7)}
-                    value={formData.vehicleNumber}
-                    onChange={(e) =>
-                      updateFormData("vehicleNumber", e.target.value)
-                    }
-                    placeholder="Enter vehicle number"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-              </div>
-
-            </CardContent>
-          </Card>
-
-          {/* Middle Column - Financial Details */}
-          <Card className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-lg h-[630px] rounded-lg">
-            <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <Calculator size={18} />
-                Financial Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="gst"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    GST
-                  </Label>
-                  <Input
-                    id="gst"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 8)}
-                    value={formData.gst}
-                    onChange={(e) => updateFormData("gst", e.target.value)}
-                    placeholder="0.00"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="tds2"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    TDS (2%)
-                  </Label>
-                  <Input
-                    id="tds2"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 9)}
-                    value={formData.tds2}
-                    onChange={(e) => updateFormData("tds2", e.target.value)}
-                    placeholder="0.00"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="tds01"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    TDS (0.1%)
-                  </Label>
-                  <Input
-                    id="tds01"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 10)}
-                    value={formData.tds01}
-                    onChange={(e) => updateFormData("tds01", e.target.value)}
-                    placeholder="0.00"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="be"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Billing Excess
-                  </Label>
-                  <Input
-                    id="be"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 11)}
-                    value={formData.be}
-                    onChange={(e) => updateFormData("be", e.target.value)}
-                    placeholder="0.00"
-                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label
-                  htmlFor="dalla"
-                  className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                >
-                  Dalla
-                </Label>
-                <Input
-                  id="dalla"
-                  ref={addInputRef}
-                  onKeyDown={(e) => handleKeyDown(e, 12)}
-                  value={formData.dalla}
-                  onChange={(e) => updateFormData("dalla", e.target.value)}
-                  placeholder="0.00"
-                  className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                />
-              </div>
-
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Dhara (1.5%)</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={includeDhara}
-                        onChange={() => setIncludeDhara(!includeDhara)}
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  <span className="text-blue-600 font-semibold text-base">
-                    {includeDhara ? `-₹${OPFP}` : '₹0'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Bank Charges</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={includeBankCharges}
-                        onChange={() => setIncludeBankCharges(!includeBankCharges)}
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  <span className="text-blue-600 font-semibold text-base">
-                    {includeBankCharges ? `-₹${bankCharges}` : '₹0'}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Right Column - Add Items */}
-          <Card className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 shadow-lg h-[630px] flex flex-col rounded-lg border border-zinc-300 dark:border-zinc-700">
-            <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <Plus size={18} />
-                Add Items ({items.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 flex flex-col">
-              {/* Fixed top section with inputs and button */}
-              <div className="space-y-4 mb-4">
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="quantity"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Quantity
-                  </Label>
-                  <Input
-                    id="quantity"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 13)}
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="Enter quantity"
-                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="price"
-                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
-                  >
-                    Price
-                  </Label>
-                  <Input
-                    id="price"
-                    ref={addInputRef}
-                    onKeyDown={(e) => handleKeyDown(e, 14)}
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="Enter price"
-                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
-                  />
-                </div>
-              </div>
-
-              <Button
-                onClick={handleAddItem}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-base h-10 mb-6"
-                disabled={!quantity || !price}
+        <Tabs value={currentBillIndex.toString()} onValueChange={(val) => setCurrentBillIndex(parseInt(val))} className="w-full">
+          <TabsList className="bg-zinc-100 dark:bg-zinc-800 mb-4 w-full justify-start overflow-x-auto h-auto min-h-10 py-1">
+            {bills.map((bill, index) => (
+              <TabsTrigger
+                key={bill.id}
+                value={index.toString()}
+                className="px-4 py-2 data-[state=active]:bg-orange-500 data-[state=active]:text-white whitespace-nowrap"
               >
-                <Plus size={18} className="mr-2" />
-                Add Item (Shift)
-              </Button>
+                Bill {index + 1}
+                {bill.formData.partyName && ` - ${bill.formData.partyName}`}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-              {/* Items List with fixed header and scrollable content */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">
-                    Items Added
-                  </h3>
-                  {items.length > 0 && (
-                    <span className="text-orange-600 font-semibold text-base">
-                      Total: ₹{itemTotal.toFixed(2)}
-                    </span>
-                  )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+            {/* Left Column - Basic Information */}
+            <Card className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-lg h-[630px] rounded-lg">
+              <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <FileText size={18} />
+                  Basic Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="space-y-3">
+                  <Label
+                    htmlFor="partyName"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                  >
+                    Party Name *
+                  </Label>
+                  <Input
+                    id="partyName"
+                    ref={addInputRef}
+                    onKeyDown={(e) => handleKeyDown(e, 0)}
+                    value={formData.partyName}
+                    onChange={(e) => updateFormData("partyName", e.target.value)}
+                    placeholder="Enter party name"
+                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                  />
                 </div>
 
-                {items.length === 0 ? (
-                  <div className="p-6 text-center border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
-                    <div className="text-zinc-400 dark:text-zinc-500 mb-3">
-                      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xl">
-                        📋
-                      </div>
-                    </div>
-                    <p className="text-zinc-500 text-sm">No items added yet</p>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="billNumber"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Bill Number
+                    </Label>
+                    <Input
+                      id="billNumber"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 1)}
+                      value={formData.billNumber}
+                      onChange={(e) => updateFormData("billNumber", e.target.value)}
+                      placeholder="Enter bill number"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
                   </div>
-                ) : (
-                  <div className="h-[200px] overflow-y-auto bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4">
-                    <div className="space-y-3">
-                      {items.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-sm transition-shadow"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-4">
-                              <span className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
-                                #{index + 1}
-                              </span>
-                              <div className="text-zinc-800 dark:text-zinc-100">
-                                <span className="font-semibold text-base">
-                                  {item.quantity}
-                                </span>
-                                <span className="text-zinc-500 mx-2">×</span>
-                                <span className="font-semibold text-base">
-                                  ₹{item.price}
-                                </span>
-                                <span className="text-zinc-500 mx-2">=</span>
-                                <span className="font-bold text-orange-600 text-base">
-                                  ₹{item.total.toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
-                          >
-                            <Trash2 size={18} />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="amount"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Bill Amount
+                    </Label>
+                    <Input
+                      id="amount"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 2)}
+                      value={formData.amount}
+                      onChange={(e) => updateFormData("amount", e.target.value)}
+                      placeholder="0.00"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label
+                    htmlFor="bill"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                  >
+                    Basic Price
+                  </Label>
+                  <Input
+                    id="bill"
+                    ref={addInputRef}
+                    onKeyDown={(e) => handleKeyDown(e, 3)}
+                    value={formData.bill}
+                    onChange={(e) => updateFormData("bill", e.target.value)}
+                    placeholder="0.00"
+                    className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="quanrev"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Quantity Received
+                    </Label>
+                    <Input
+                      id="quanrev"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 4)}
+                      value={formData.quanrev}
+                      onChange={(e) => updateFormData("quanrev", e.target.value)}
+                      placeholder="0"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="dust"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Dust
+                    </Label>
+                    <Input
+                      id="dust"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 5)}
+                      value={formData.dust}
+                      onChange={(e) => updateFormData("dust", e.target.value)}
+                      placeholder="0"
+                      className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                {totalQuantity >= 0 && (
+                  <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                    <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                      <strong className="text-zinc-800 dark:text-white">Final Weight:</strong>{" "}
+                      {formData.quanrev ? formData.quanrev : 0} - {formData.dust ? formData.dust : 0} ={" "}
+                      <span className="font-bold text-orange-600 text-base">
+                        {totalQuantity}
+                      </span>
+                    </p>
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="date"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Date *
+                    </Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 6)}
+                      value={formData.date}
+                      onChange={(e) => updateFormData("date", e.target.value)}
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="vehicleNumber"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Vehicle Number *
+                    </Label>
+                    <Input
+                      id="vehicleNumber"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 7)}
+                      value={formData.vehicleNumber}
+                      onChange={(e) =>
+                        updateFormData("vehicleNumber", e.target.value)
+                      }
+                      placeholder="Enter vehicle number"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+
+            {/* Middle Column - Financial Details */}
+            <Card className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-lg h-[630px] rounded-lg">
+              <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <Calculator size={18} />
+                  Financial Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="gst"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      GST
+                    </Label>
+                    <Input
+                      id="gst"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 8)}
+                      value={formData.gst}
+                      onChange={(e) => updateFormData("gst", e.target.value)}
+                      placeholder="0.00"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="tds2"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      TDS (2%)
+                    </Label>
+                    <Input
+                      id="tds2"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 9)}
+                      value={formData.tds2}
+                      onChange={(e) => updateFormData("tds2", e.target.value)}
+                      placeholder="0.00"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="tds01"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      TDS (0.1%)
+                    </Label>
+                    <Input
+                      id="tds01"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 10)}
+                      value={formData.tds01}
+                      onChange={(e) => updateFormData("tds01", e.target.value)}
+                      placeholder="0.00"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="be"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Billing Excess
+                    </Label>
+                    <Input
+                      id="be"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 11)}
+                      value={formData.be}
+                      onChange={(e) => updateFormData("be", e.target.value)}
+                      placeholder="0.00"
+                      className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label
+                    htmlFor="dalla"
+                    className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                  >
+                    Dalla
+                  </Label>
+                  <Input
+                    id="dalla"
+                    ref={addInputRef}
+                    onKeyDown={(e) => handleKeyDown(e, 12)}
+                    value={formData.dalla}
+                    onChange={(e) => updateFormData("dalla", e.target.value)}
+                    placeholder="0.00"
+                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                  />
+                </div>
+
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Dhara (1.5%)</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={includeDhara}
+                          onChange={() => setIncludeDhara(!includeDhara)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    <span className="text-blue-600 font-semibold text-base">
+                      {includeDhara ? `-₹${OPFP}` : '₹0'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Bank Charges</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={includeBankCharges}
+                          onChange={() => setIncludeBankCharges(!includeBankCharges)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    <span className="text-blue-600 font-semibold text-base">
+                      {includeBankCharges ? `-₹${bankCharges}` : '₹0'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Right Column - Add Items */}
+            <Card className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 shadow-lg h-[630px] flex flex-col rounded-lg border border-zinc-300 dark:border-zinc-700">
+              <CardHeader className="pb-4 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800">
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <Plus size={18} />
+                  Add Items ({items.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 flex flex-col">
+                {/* Fixed top section with inputs and button */}
+                <div className="space-y-4 mb-4">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="quantity"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Quantity
+                    </Label>
+                    <Input
+                      id="quantity"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 13)}
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      placeholder="Enter quantity"
+                      className="bg-white dark:bg-[#18181B] border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="price"
+                      className="text-zinc-700 dark:text-zinc-300 font-semibold text-sm"
+                    >
+                      Price
+                    </Label>
+                    <Input
+                      id="price"
+                      ref={addInputRef}
+                      onKeyDown={(e) => handleKeyDown(e, 14)}
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="Enter price"
+                      className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:ring-orange-200 text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleAddItem}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-base h-10 mb-6"
+                  disabled={!quantity || !price}
+                >
+                  <Plus size={18} className="mr-2" />
+                  Add Item (Shift)
+                </Button>
+
+                {/* Items List with fixed header and scrollable content */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">
+                      Items Added
+                    </h3>
+                    {items.length > 0 && (
+                      <span className="text-orange-600 font-semibold text-base">
+                        Total: ₹{itemTotal.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+
+                  {items.length === 0 ? (
+                    <div className="p-6 text-center border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
+                      <div className="text-zinc-400 dark:text-zinc-500 mb-3">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xl">
+                          📋
+                        </div>
+                      </div>
+                      <p className="text-zinc-500 text-sm">No items added yet</p>
+                    </div>
+                  ) : (
+                    <div className="h-[200px] overflow-y-auto bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4">
+                      <div className="space-y-3">
+                        {items.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-sm transition-shadow"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-4">
+                                <span className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
+                                  #{index + 1}
+                                </span>
+                                <div className="text-zinc-800 dark:text-zinc-100">
+                                  <span className="font-semibold text-base">
+                                    {item.quantity}
+                                  </span>
+                                  <span className="text-zinc-500 mx-2">×</span>
+                                  <span className="font-semibold text-base">
+                                    ₹{item.price}
+                                  </span>
+                                  <span className="text-zinc-500 mx-2">=</span>
+                                  <span className="font-bold text-orange-600 text-base">
+                                    ₹{item.total.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
+                            >
+                              <Trash2 size={18} />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </Tabs>
 
         {/* Summary */}
         {items.length >= 0 && (
@@ -853,6 +911,8 @@ const BillGenerator = ({ onLogout }) => {
               totalQuantity,
               bankCharges,
             }}
+            bills={bills}
+            billsPerPage={billsPerPage}
             onClose={() => setShowInvoice(false)}
           />
         )}
