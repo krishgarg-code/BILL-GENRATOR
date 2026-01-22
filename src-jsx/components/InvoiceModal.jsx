@@ -42,7 +42,7 @@ const InvoiceModal = ({ formData, items, calculations, onClose, bills, billsPerP
   };
 
   const handlePrint = () => {
-    const printContents = document.getElementById("invoice-section")?.innerHTML;
+    const printContents = document.getElementById("invoice-section")?.outerHTML;
     if (!printContents) return;
 
     const printWindow = window.open("", "_blank", "height=800,width=800");
@@ -52,62 +52,62 @@ const InvoiceModal = ({ formData, items, calculations, onClose, bills, billsPerP
     printWindow.document.write("<style>");
     printWindow.document.write(`
       @media print {
-        @page { margin: 0; size: A4; }
+        @page { size: A4; margin: 0; }
         body {
           margin: 0;
-          padding: 10px;
+          padding: 0;
           font-family: 'Segoe UI', sans-serif;
           color: #000;
           background: #fff;
-          -webkit-print-color-adjust: exact;
+          width: 210mm;
+          height: 297mm;
         }
         .no-print { display: none !important; }
+        
+        #invoice-section {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            padding: 10mm;
+            box-sizing: border-box;
+            gap: 5mm; 
+        }
+
+        .bill-container {
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Grid Layouts */
+        .grid-1 { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+        .grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+        /* Compact styles for multi-bill */
+        .compact-mode h1, .compact-mode h2, .compact-mode h3 { margin: 2px 0; font-size: 14px; }
+        .compact-mode p { margin: 1px 0; font-size: 10px; }
+        .compact-mode table th, .compact-mode table td { padding: 2px 4px; font-size: 10px; }
+        .compact-mode .text-xl { font-size: 12px; }
+        .compact-mode .text-lg { font-size: 11px; }
+
         table {
           width: 100%;
           border-collapse: collapse;
           margin: 5px 0;
-          font-size: 11px;
         }
         th, td {
-          padding: 4px 6px;
           border: 1px solid #ddd;
           text-align: left;
+          padding: 4px;
         }
         th {
           background-color: #f5f5f5;
           font-weight: bold;
         }
-        h1, h2, h3, h4, p { margin: 4px 0; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .company-name { font-size: 24px; font-weight: bold; color: #333; }
-        .invoice-title { font-size: 20px; margin: 10px 0; }
-        .totals { margin-top: 10px; font-size: 11px; }
-        .grand-total { font-size: 14px; font-weight: bold; }
-        
-        /* Grid Layouts */
-        .bills-grid {
-            display: grid;
-            width: 100%;
-            height: 98vh; /* Full page height */
-            gap: 10px;
-            box-sizing: border-box;
-        }
-        .grid-1 { grid-template-columns: 1fr; }
-        .grid-2 { grid-template-rows: 1fr 1fr; } 
-        .grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-        .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-
-        .bill-container {
-            border: 1px solid #ccc;
-            padding: 10px;
-            height: 100%;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .compact-text { font-size: 10px; }
-        .compact-header { font-size: 12px; font-weight: bold; }
       }
     `);
     printWindow.document.write("</style></head><body>");
@@ -126,24 +126,31 @@ const InvoiceModal = ({ formData, items, calculations, onClose, bills, billsPerP
     const element = document.getElementById("invoice-section");
     if (!element) return;
 
+    // Use the first bill for naming if multi-bill
+    const firstBill = isMultiBill && bills && bills[0] ? bills[0].formData : formData;
+
     // Format the date as DD-MM-YYYY
-    const formattedDate = new Date(formData.date).toLocaleDateString('en-IN', {
+    const formattedDate = new Date(firstBill.date || new Date()).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     }).split('/').join('.');
 
-    // Create filename with party name, vehicle number, and date
-    const partyName = formData.partyName.replace(/\s+/g, '_').replace(/[^\w\s]/gi, '');
-    const vehicleNumber = formData.vehicleNumber.replace(/\s+/g, '_').replace(/[^\w\s]/gi, '');
-    const filename = `${partyName}_${vehicleNumber}_${formattedDate}.pdf`;
+    // Create filename
+    const partyName = (firstBill.partyName || 'Unknown').replace(/\s+/g, '_').replace(/[^\w\s]/gi, '');
+    const vehicleNumber = (firstBill.vehicleNumber || '').replace(/\s+/g, '_').replace(/[^\w\s]/gi, '');
+
+    // Naming convention similar to InvoiceModal2
+    const filename = isMultiBill
+      ? `Bills_${partyName}_${formattedDate}.pdf` // Simplified for multi-bill
+      : `${partyName}_${vehicleNumber}_${formattedDate}.pdf`;
 
     const opt = {
-      margin: 0.5,
+      margin: 0, // Zero margin as we handle it in CSS
       filename: filename,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
 
     html2pdf().set(opt).from(element).save();
@@ -152,12 +159,16 @@ const InvoiceModal = ({ formData, items, calculations, onClose, bills, billsPerP
   const isMultiBill = billsPerPage > 1;
 
   if (isMultiBill) {
-    const gridClass = billsPerPage === 2 ? "grid-2" : "grid-4";
+    // Grid logic matching InvoiceModal2
+    const gridClass = billsPerPage === 2 ? "grid-cols-1 grid-rows-2" : "grid-cols-2 grid-rows-2";
+    const printGridClass = billsPerPage === 2 ? "grid-2" : "grid-4";
+    const isCompact = true;
+
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-2xl max-w-[95vw] w-full max-h-[90vh] overflow-auto">
+        <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full h-[95vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg no-print">
+          <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg shrink-0">
             <h2 className="text-xl font-semibold">Multi-Invoice Preview ({billsPerPage} Bills)</h2>
             <div className="flex gap-2">
               <Button onClick={handleDownloadPDF} size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/30">
@@ -172,72 +183,83 @@ const InvoiceModal = ({ formData, items, calculations, onClose, bills, billsPerP
             </div>
           </div>
 
-          <div id="invoice-section" className="p-4 bg-white text-black">
-            <div className={`bills-grid ${gridClass}`}>
+          <div className="overflow-auto flex-1 bg-gray-100 p-8 flex justify-center">
+            <div
+              id="invoice-section"
+              className={`bg-white shadow-lg grid gap-4 p-8 box-border ${gridClass} ${printGridClass} ${isCompact ? 'compact-mode' : ''}`}
+              style={{ width: '210mm', minHeight: '297mm' }}
+            >
               {bills && bills.slice(0, billsPerPage).map((bill, idx) => {
                 const bData = bill.formData;
                 const bItems = bill.items;
                 const { itemTotal, OPFP, bankCharges, grandTotal, endTotal, totalQuantity } = calculateBillTotals(bData, bItems);
 
                 return (
-                  <div key={idx} className="bill-container text-xs">
-                    {/* Compact Header */}
-                    <div className="flex justify-between items-start border-b pb-2 mb-2">
-                      <div>
-                        <div className="font-bold text-lg md:text-xl line-clamp-1">{bData.partyName}</div>
-                        <div className="font-semibold">{bData.vehicleNumber}</div>
+                  <div key={idx} className="bill-container border border-gray-200 p-4 flex flex-col justify-between h-full bg-white relative">
+                    {/* Bill Content */}
+                    <div>
+                      {/* Compact Header */}
+                      <div className="flex justify-between items-start border-b pb-2 mb-2">
+                        <div>
+                          <div className="font-bold text-lg md:text-xl line-clamp-1">{bData.partyName}</div>
+                          <div className="font-semibold">{bData.vehicleNumber}</div>
+                        </div>
+                        <div className="text-right whitespace-nowrap">
+                          <div>{bData.date ? new Date(bData.date).toLocaleDateString() : 'N/A'}</div>
+                          {bData.billNumber && <div>No: {bData.billNumber}</div>}
+                        </div>
                       </div>
-                      <div className="text-right whitespace-nowrap">
-                        <div>{bData.date ? new Date(bData.date).toLocaleDateString() : 'N/A'}</div>
-                        {bData.billNumber && <div>No: {bData.billNumber}</div>}
-                      </div>
-                    </div>
 
-                    {/* Weight Details Compact */}
-                    {(bData.quanrev || bData.dust) && (
-                      <div className="mb-2 p-1 bg-gray-50 rounded text-[10px]">
-                        <strong>Weight:</strong> {bData.quanrev} - {bData.dust} = {totalQuantity}
-                      </div>
-                    )}
+                      {/* Weight Details Compact */}
+                      {(bData.quanrev || bData.dust) && (
+                        <div className="mb-2 p-1 bg-gray-50 rounded text-[10px]">
+                          <strong>Weight:</strong> {bData.quanrev} - {bData.dust} = {totalQuantity}
+                        </div>
+                      )}
 
-                    {/* Items Table */}
-                    <div className="flex-grow overflow-auto mb-2">
-                      <table className="w-full text-[10px] border-collapse">
-                        <thead className="bg-gray-100">
-                          <tr>
-                            <th className="p-1 text-left w-8">#</th>
-                            <th className="p-1 text-right">Price</th>
-                            <th className="p-1 text-right">Qty</th>
-                            <th className="p-1 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {bItems.map((item, i) => (
-                            <tr key={i} className="border-b">
-                              <td className="p-1">{i + 1}</td>
-                              <td className="p-1 text-right">{item.price}</td>
-                              <td className="p-1 text-right">{item.quantity}</td>
-                              <td className="p-1 text-right">{item.total.toFixed(0)}</td>
+                      {/* Items Table */}
+                      <div className="mb-2">
+                        <table className="w-full text-[10px] border-collapse">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="p-1 text-left w-8">#</th>
+                              <th className="p-1 text-right">Price</th>
+                              <th className="p-1 text-right">Qty</th>
+                              <th className="p-1 text-right">Total</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {bItems.map((item, i) => (
+                              <tr key={i} className="border-b">
+                                <td className="p-1">{i + 1}</td>
+                                <td className="p-1 text-right">{item.price}</td>
+                                <td className="p-1 text-right">{item.quantity}</td>
+                                <td className="p-1 text-right">{item.total.toFixed(0)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
 
                     {/* Summary Footer */}
-                    <div className="mt-auto border-t pt-2 space-y-1 text-[10px]">
+                    <div className="text-xs space-y-1 border-t pt-2 mt-auto">
                       <div className="flex justify-between font-semibold">
                         <span>Subtotal:</span>
                         <span>{itemTotal.toFixed(0)}</span>
                       </div>
-                      {/* Compact Deductions Row */}
+
                       <div className="flex flex-wrap gap-x-3 text-gray-600">
                         {includeDhara && <span>Dhara: -{OPFP}</span>}
                         {includeBankCharges && <span>Bank: -{bankCharges}</span>}
                         {bData.dalla && <span>Dalla: -{bData.dalla}</span>}
+                        {bData.tds2 && <span>TDS(2%): -{bData.tds2}</span>}
+                        {bData.tds01 && <span>TDS(0.1%): -{bData.tds01}</span>}
+                        {bData.be && <span>BE: -{bData.be}</span>}
                       </div>
 
-                      <div className="flex justify-between text-sm font-bold border-t border-dashed pt-1 mt-1">
+                      <hr className="my-1" />
+                      <div className="flex justify-between font-bold text-sm">
                         <span>Total:</span>
                         <span>{grandTotal}</span>
                       </div>
